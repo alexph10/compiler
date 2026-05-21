@@ -111,4 +111,77 @@ impl CPlugin {
             .current_dir(path)
             .output()?)
     }
+
+    fn make_build(&self, path: &Path, opts: &BuildOpts) -> Result<std::process::Output> {
+        let mut args = vec![
+            format!("CC={}", self.compiler),
+            format!("CXX={}++", self.compiler),
+        ];
+        if opts.release {
+            args.push("RELEASE=1".into());
+        }
+        let str_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        Ok(Command::new("make")
+            .args(&str_args)
+            .current_dir(path)
+            .output()?)
+    }
+
+    fn meson_build(&self, path: &Path, opts: &BuildOpts) -> Result<std::process::Output> {
+        let build_type = if opts.release { "release" } else { "debug" };
+        if !path.join("build").join("build.ninja").exists() {
+            Command::new("meson")
+                .args(["setup", "build", &format!("--buildtype={build_type}")])
+                .current_dir(path)
+                .output()?;
+        }
+        Ok(Command::new("meson")
+            .args(["compile", "-C", "build"])
+            .current_dir(path)
+            .output()?)
+    }
+}
+
+fn parse_c_errors(output: &str) -> Vec<LintDiagnostic> {
+    let mut diags = Vec::new();
+    let re = regex::Regex::new(r"(.+\.(?:c|cpp|h|hpp)):(\d+):\s*(error|warning):\s*(.+)").unwrap();
+    for cap in re.captures_iter(output) {
+        diags.push(LintDiagnostic {
+            file: cap[1].to_string(),
+            line: cap[2].parse().unwrap_or(0),
+            col: cap[3].parse().unwrap_or(0),
+            rule: "compiler".into(),
+            severity: if &cap[4] == "error" {
+                Severity::Error
+            } else {
+                Severity::Warning
+            },
+            message: cap[5].to_string(),
+            suggestion: None,
+        });
+    }
+    diags
+}
+
+fn parse_cppcheck(output: &str) -> Vec<LintDiagnostic> {
+    let mut diags = Vec::new();
+    let re = regex::Regex::new(r"(.+):(\d+):(\d+):\s*(\w+):\s*(.+)\s*\[(\w+)\]").unwrap();
+    for cap in re.captures_iter(output) {
+        let severity = match &cap[4] {
+            "error" => Severity::Error,
+            "warning" => Severity::Warning,
+            "style" | "performance" | "portability" => Severity::Info,
+            _ => Severity::Hint,
+        };
+        diags.push(LintDiagnostic {
+            file: cap[1].to_string(),
+            line: cap[2].parse().unwrap_or(0),
+            col: cap[3].parse().unwrap_or(0),
+            rule: cap[6].to_string(),
+            severity,
+            message: cap[5].to_string(),
+            suggestion: None,
+        });
+    }
+    diags
 }
