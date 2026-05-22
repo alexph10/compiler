@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "multilanguage compiler build that detects, organizes and AI-fixes projects across six languages"
 repository = "https://github.com/alexph10/compiler"
-keyword = ["build", "polyglot", "lint", "multilanguage"]
+keywords = ["build", "polyglot", "lint", "multilanguage"]
 
 
 [[bin]]

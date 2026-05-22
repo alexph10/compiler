@@ -6,14 +6,14 @@ use std::process::Command;
 
 pub struct RustPlugin {
     linker: String,
-    linker: String,
+    linter: String,
 }
 
 impl RustPlugin {
     pub fn new(config: &Config) -> Self {
         Self {
             linker: config.rust.linker.clone(),
-            linker: config.lint.rust.clone(),
+            linter: config.lint.rust.clone(),
         }
     }
 
@@ -34,13 +34,13 @@ impl Plugin for RustPlugin {
         Language::Rust
     }
 
-    fn detect(&self, path:&Path) -> bool {
+    fn detect(&self, path: &Path) -> bool {
         path.join("Cargo.toml").exists()
     }
 
     fn build(&self, path: &Path, opts: &BuildOpts) -> Result<BuildResult> {
         let mut args = vec!["build"];
-        if opts.release{
+        if opts.release {
             args.push("--release");
         }
 
@@ -80,7 +80,7 @@ impl Plugin for RustPlugin {
         }
 
         Ok(BuildResult {
-            success: output.success.success(),
+            success: output.status.success(),
             output: stderr,
             errors,
         })
@@ -88,13 +88,13 @@ impl Plugin for RustPlugin {
 
     fn lint(&self, path: &Path, opts: &LintOpts) -> Result<LintResult> {
         let args = if self.linter == "clippy" {
-            let mut a = vec!["clippy", "--message-format=json"];
             if opts.fix {
-                a = vec!["clippy", "--fix", "--allow-dirty", "--message-format=json"];
+                vec!["clippy", "--fix", "--allow-dirty", "--message-format=json"]
+            } else {
+                vec!["clippy", "--message-format=json"]
             }
-            a
         } else {
-          vec!["check", "--message-format=json"]
+            vec!["check", "--message-format=json"]
         };
 
         let output = self.cargo(path, &args)?;
@@ -108,12 +108,12 @@ impl Plugin for RustPlugin {
     }
 
     fn clean(&self, path: &Path) -> Result<()> {
-        self.cargo(path, &["clean"])?,
+        self.cargo(path, &["clean"])?;
         Ok(())
     }
 }
 
-fn copy_artifacts(path: &Path, release: bool) -> Result <()> {
+fn copy_artifacts(path: &Path, release: bool) -> Result<()> {
     let profile = if release { "release" } else { "debug" };
     let target_dir = path.join("target").join(profile);
     let build_dir = path.join("build");
@@ -131,19 +131,22 @@ fn copy_artifacts(path: &Path, release: bool) -> Result <()> {
             let name_str = name.to_string_lossy();
             if name_str.ends_with(".d")
                 || name_str.ends_with(".fingerprint")
-                || name_str.starts_with("lib") && name_str.ends_with(".rlib")
-                || name_str.contains(".cargo-lock") {
-                    continue;
-                }
-            #[cfg(unix)]{
-                use std::os::unix::fs::PermissionExt;
+                || (name_str.starts_with("lib") && name_str.ends_with(".rlib"))
+                || name_str.contains(".cargo-lock")
+            {
+                continue;
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
                 if let Ok(meta) = entry.metadata() {
                     let mode = meta.permissions().mode();
                     if mode & 0o111 == 0
                         && !name_str.ends_with(".so")
                         && !name_str.ends_with(".dylib")
-                        && !name_str.ends_with(".a") {
-                            continue;
+                        && !name_str.ends_with(".a")
+                    {
+                        continue;
                     }
                 }
             }
@@ -158,7 +161,7 @@ fn parse_cargo_diagnostics(stderr: &str) -> Vec<LintDiagnostic> {
     let mut diags = Vec::new();
     let re = regex::Regex::new(r"(?m)^error\[?\w*\]?: (.+)\n\s*--> (.+):(\d+):(\d+)").unwrap();
     for cap in re.captures_iter(stderr) {
-        diags.push(LintDiagnostic{
+        diags.push(LintDiagnostic {
             file: cap[2].to_string(),
             line: cap[3].parse().unwrap_or(0),
             col: cap[4].parse().unwrap_or(0),
@@ -219,7 +222,7 @@ fn parse_cargo_json_diagnostics(output: &str) -> Vec<LintDiagnostic> {
                     let suggestion = msg
                         .get("children")
                         .and_then(|c| c.as_array())
-                        .and_then(|children| childrent.first())
+                        .and_then(|children| children.first())
                         .and_then(|child| child.get("message"))
                         .and_then(|m| m.as_str())
                         .map(|s| s.to_string());

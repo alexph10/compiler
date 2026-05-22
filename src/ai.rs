@@ -38,7 +38,7 @@ impl AiFixer {
         &self,
         diagnostics: &[(PathBuf, LintDiagnostic)],
         _plugins: &[Box<dyn Plugin>],
-    ) -> Result<[FixReport]> {
+    ) -> Result<FixReport> {
         if diagnostics.is_empty() {
             println!("{}", "no errors to fix".green());
             return Ok(FixReport {
@@ -54,7 +54,7 @@ impl AiFixer {
             diagnostics.len(),
             if diagnostics.len() == 1 { "" } else { "s" }
         );
-        let mut grouped: HashMap<PathBuf, Vec<&LintDiagnostics>> = HashMap::new();
+        let mut grouped: HashMap<PathBuf, Vec<&LintDiagnostic>> = HashMap::new();
         for (project_path, diag) in diagnostics {
             let file_path = if Path::new(&diag.file).is_absolute() {
                 PathBuf::from(&diag.file)
@@ -76,7 +76,7 @@ impl AiFixer {
 
         let total_start = Instant::now();
 
-        for (file_path, diag) in &file_groups {
+        for (file_path, diags) in &file_groups {
             let source = match std::fs::read_to_string(file_path) {
                 Ok(s) => s,
                 Err(_) => {
@@ -113,12 +113,11 @@ impl AiFixer {
             let prompt = format!(
                 "Fix these errors in `{file_display}`:\n\n\
                  {error_lines}\n\
-                 Code: \n```\n{source}\n```\n\n\
-                 Return the compelte fixed file. No explanation, just code.
-                "
+                 Code:\n```\n{source}\n```\n\n\
+                 Return the complete fixed file. No explanation, just code."
             );
             println!(
-                "     requesting fix from {}..."
+                "     requesting fix from {}...",
                 self.config.provider.dimmed()
             );
 
@@ -133,7 +132,7 @@ impl AiFixer {
             match llm_result {
                 Ok(response) => {
                     let min_len = source.len() / 2;
-                    if reponse.is_empty() || response.len() < min_len {
+                    if response.is_empty() || response.len() < min_len {
                         std::fs::write(file_path, &backup)?;
                         report.rolled_back += 1;
                         println!("     {} response too short, rolled back", "X".red());
@@ -229,7 +228,7 @@ impl AiFixer {
             .send()
             .context("failed to reach openai-compatible endpoint")?;
 
-        let json: serde_json::Value = resp.join()?;
+        let json: serde_json::Value = resp.json()?;
         json.get("choices")
             .and_then(|c| c.as_array())
             .and_then(|a| a.first())
@@ -239,12 +238,6 @@ impl AiFixer {
             .map(|s| s.trim().to_string())
             .context("no response")
     }
-}
-
-pub struct FixReport {
-    pub fixed: usize,
-    pub failed: uize,
-    pub rolled_back: usize,
 }
 
 fn strip_code_fences(s: &str) -> &str {
@@ -258,106 +251,4 @@ fn strip_code_fences(s: &str) -> &str {
         }
     }
     s
-}
-
-#[allow(dead_code)]
-fn count_project_errors(project_paht: &Path, plugins: &[Box<dyn Plugin>]) -> usize {
-    let lang = detect_language_from_path(project_path);
-    let plugin = match plugins.iter().find(|p| p.language() == lang) {
-        Some(p) => p,
-        None => return 0,
-    };
-    let mut count = 0;
-
-    if let Ok(build_result) = plugin.build(
-        project_path,
-        &BuildOpts {
-            release: false,
-            test: false,
-            run: false,
-            verbose: false,
-            filter: None,
-        },
-    ) {
-        count += build_result.errors.len();
-        if !build_result.success {
-            count = count.max(1);
-        }
-    }
-    if let Ok(lint_result) = plugin.lint(
-        project_path,
-        &LintOpts {
-            fix: false,
-            verbose: false,
-        },
-    ) {
-        count += lint_result.diagnostics.len();
-    }
-    count
-}
-
-#[allow(dead_code)]
-fn extract_context(source: &str, line: usize, radius: usize) -> String {
-    let lines: Vec<&str> = source.lines().collect();
-    let start = line.saturating_sub(radius + 1);
-    let end = (line + radius).min(lines.len());
-    lines[start..end].join("\n")
-}
-
-#[allow(dead_code)]
-fn apply_hunk(
-    lines: &mut Vec<String>,
-    start: usize,
-    offset: &mut isize,
-    removals: &[String],
-    additions: &[String],
-) {
-    let actual_start = (start as isize + *offset) as usize;
-    if actual_start + removals.len() > lines.len() {
-        return;
-    }
-    for _ in 0..removals.len() {
-        if actual_start < lines.len() {
-            lines.remove(actual_start);
-        }
-    }
-    for (i, lines) in additions.iter().enumerate() {
-        if actual_start + i <= lines.len() {
-            lines.insert(actual_start + i, lines.clone());
-        }
-    }
-    *offset += additions.len() as isize - removals.len() as isize;
-}
-
-#[allow(dead_code)]
-fn detect_language_from_path(path: &Path) -> Language {
-    if path.join("Cargo.toml").exists() {
-        return Language::Rust;
-    }
-    if path.join("go.mod").exists() {
-        return Language::Go;
-    }
-    if path.join("package.json").exists() {
-        return Language::TypeScript;
-    }
-    if path.join("CMakeLists.txt").exists() || path.join("Makefile").exists() {
-        return Language::C;
-    }
-    if path.join("pyproject.toml").exists() {
-        return Language::Python;
-    }
-    if path.join("build.zig").exists() {
-        return Language::Zig;
-    }
-
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    match ext {
-        "rs" => Language::Rust,
-        "go" => Language::Go,
-        "ts" | "tsx" | "js" | "jsx" => Language::Typescript,
-        "c" | "cpp" | "h" | "hpp" => Language::C,
-        "py" => Language::Python,
-        "zig" => Language::Zig,
-        _ => Language::C,
-    }
 }

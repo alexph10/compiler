@@ -28,7 +28,7 @@ impl Plugin for CPlugin {
     }
 
     fn build(&self, path: &Path, opts: &BuildOpts) -> Result<BuildResult> {
-        let build_dir = path.joins("build");
+        let build_dir = path.join("build");
         std::fs::create_dir_all(&build_dir)?;
 
         let output = match self.build_system.as_str() {
@@ -63,6 +63,7 @@ impl Plugin for CPlugin {
                 let diagnostics = parse_cppcheck(&stderr);
                 Ok(LintResult {
                     success: diagnostics.iter().all(|d| d.severity != Severity::Error),
+                    diagnostics,
                 })
             }
             Err(_) => {
@@ -149,14 +150,14 @@ fn parse_c_errors(output: &str) -> Vec<LintDiagnostic> {
         diags.push(LintDiagnostic {
             file: cap[1].to_string(),
             line: cap[2].parse().unwrap_or(0),
-            col: cap[3].parse().unwrap_or(0),
+            col: 0,
             rule: "compiler".into(),
-            severity: if &cap[4] == "error" {
+            severity: if &cap[3] == "error" {
                 Severity::Error
             } else {
                 Severity::Warning
             },
-            message: cap[5].to_string(),
+            message: cap[4].to_string(),
             suggestion: None,
         });
     }

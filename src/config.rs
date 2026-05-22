@@ -29,7 +29,7 @@ pub struct TsConfig {
 impl Default for TsConfig {
     fn default() -> Self {
         Self {
-            runtime: "bun".info(),
+            runtime: "bun".into(),
             package_manager: "bun".into(),
         }
     }
@@ -49,7 +49,7 @@ impl Default for PythonConfig {
     }
 }
 
-#[derive(Debug, Deserialize. Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CConfig {
     #[serde(default = "default_clang")]
     pub compiler: String,
@@ -105,7 +105,7 @@ pub struct AiConfig {
     #[serde(default = "default_ollama")]
     pub provider: String,
     #[serde(default = "default_llama3")]
-    pub mode: String,
+    pub model: String,
     #[serde(default = "default_ollama_endpoint")]
     pub endpoint: String,
 }
@@ -158,12 +158,12 @@ impl Config {
     pub fn load(project_root: &Path) -> Result<Self> {
         let local = project_root.join(".compiler").join("config.toml");
         if local.exists() {
-            let content = std::fs::read_to_string(&local);
+            let content = std::fs::read_to_string(&local)?;
             return Ok(toml::from_str(&content)?);
         }
         if let Some(global) = global_config_path() {
             if global.exists() {
-                let content = std::fs::read_to_string(&global);
+                let content = std::fs::read_to_string(&global)?;
                 return Ok(toml::from_str(&content)?);
             }
         }
@@ -172,18 +172,18 @@ impl Config {
 }
 
 fn global_config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("poc").join("config.toml"))
+    dirs::config_dir().map(|d| d.join("compiler").join("config.toml"))
 }
 
 pub fn generate_config(root: &Path, projects: &[crate::types::DetectedProject]) -> Result<()> {
     use crate::types::Language;
     let compiler_dir = root.join(".compiler");
-    let _ = std::fs::create_dir_all(&compiler_dir);
-    let config_path = poc_dir.join("config.toml");
+    std::fs::create_dir_all(&compiler_dir)?;
+    let config_path = compiler_dir.join("config.toml");
     if config_path.exists() {
         anyhow::bail!(
             ".compiler/config.toml already exists at {}",
-            config.path.display()
+            config_path.display()
         );
     }
 
@@ -221,7 +221,7 @@ pub fn generate_config(root: &Path, projects: &[crate::types::DetectedProject]) 
     }
 
     sections.push(
-        "[ai]\nprovider = \"ollama\"\nmodel = \"llama3\"\nendpoint = \"http://0.0.0.0:11434\""
+        "[ai]\nprovider = \"ollama\"\nmodel = \"llama3\"\nendpoint = \"http://127.0.0.1:11434\""
             .to_string(),
     );
 
@@ -240,7 +240,7 @@ pub fn validate_config(root: &Path) -> Vec<String> {
     };
 
     let table: toml::Table = match content.parse() {
-        Ok(t) => c,
+        Ok(t) => t,
         Err(e) => {
             warnings.push(format!("failed to parse .compiler/config.toml: {e}"));
             return warnings;

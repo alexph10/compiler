@@ -117,7 +117,7 @@ fn run_and_report(
 
 fn try_notify_watch(
     root: &Path,
-    plugins: &[Box<dyn Plugins>],
+    plugins: &[Box<dyn Plugin>],
     projects: &[DetectedProject],
     test: bool,
     lint: bool,
@@ -148,7 +148,7 @@ fn try_notify_watch(
         let debounce_end = Instant::now() + Duration::from_millis(300);
 
         loop {
-            let remaining = debounce_end.sataurating_duration_since(Instant::now());
+            let remaining = debounce_end.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 break;
             }
@@ -164,7 +164,7 @@ fn try_notify_watch(
 
 fn poll_watch(
     _root: &Path,
-    plugins: &[Box<dyn Plugins>],
+    plugins: &[Box<dyn Plugin>],
     projects: &[DetectedProject],
     test: bool,
     lint: bool,

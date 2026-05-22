@@ -1,7 +1,7 @@
 use crate::types::*;
 use colored::Colorize;
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
 pub type BuildEntry = (DetectedProject, anyhow::Result<BuildResult>, bool, Duration);
@@ -27,24 +27,30 @@ pub fn resolve_build_order(projects: &[DetectedProject]) -> Vec<DetectedProject>
         }
     }
 
-    let mut queue: Vec<usize> = in_degree
+    let mut ready: Vec<usize> = in_degree
         .iter()
-        .filter(|(_, &deg)| deg == 0)
+        .filter(|&(_, &deg)| deg == 0)
         .map(|(&idx, _)| idx)
         .collect();
-    queue.sort();
+    ready.sort();
+    let mut queue: VecDeque<usize> = ready.into_iter().collect();
 
     let mut ordered = Vec::new();
-    while let Some(idx) = queue.pop() {
+    while let Some(idx) = queue.pop_front() {
         ordered.push(idx);
         if let Some(dependents) = graph.get(&idx) {
+            let mut newly_ready: Vec<usize> = Vec::new();
             for &dep in dependents {
                 if let Some(deg) = in_degree.get_mut(&dep) {
                     *deg -= 1;
                     if *deg == 0 {
-                        queue.push(dep);
+                        newly_ready.push(dep);
                     }
                 }
+            }
+            newly_ready.sort();
+            for dep in newly_ready {
+                queue.push_back(dep);
             }
         }
     }
@@ -402,7 +408,6 @@ pub fn print_build_results(results: &[BuildEntry], elapsed: Duration, verbose: b
     }
 
     println!();
-    let total_built = built + cached;
     if failed > 0 {
         println!(
             "{} built, {} cached, {} failed {}",
@@ -414,7 +419,7 @@ pub fn print_build_results(results: &[BuildEntry], elapsed: Duration, verbose: b
     } else {
         println!(
             "{} built, {} cached {}",
-            total_built,
+            built,
             cached,
             format!("[{}ms]", elapsed.as_millis()).dimmed()
         );
@@ -550,7 +555,7 @@ pub fn has_lint_failures(results: &[(DetectedProject, anyhow::Result<LintResult>
 pub fn print_status(
     projects: &[DetectedProject],
     plugins: &[Box<dyn Plugin>],
-    config: &crate::config::PocConfig,
+    config: &crate::config::Config,
 ) {
     println!("projects");
     for proj in projects {
@@ -763,6 +768,8 @@ fn compute_project_hash(project_path: &std::path::Path) -> Option<u64> {
                 && name != "build"
                 && name != "zig-cache"
                 && name != "__pycache__"
+                && name != ".compiler"
+                && name != ".poc"
         });
 
     for entry in walker.flatten() {
@@ -778,7 +785,7 @@ fn compute_project_hash(project_path: &std::path::Path) -> Option<u64> {
 }
 
 fn project_cache_dir(project_path: &std::path::Path) -> std::path::PathBuf {
-    project_path.join(".poc").join("cache")
+    project_path.join(".compiler").join("cache")
 }
 
 pub fn is_cached(project: &DetectedProject) -> bool {

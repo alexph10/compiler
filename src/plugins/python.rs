@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::types::*;
 use anyhow::Result;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub struct PythonPlugin {
@@ -67,7 +67,7 @@ impl Plugin for PythonPlugin {
                 "poetry" => {
                     let mut args = vec!["run", "pytest"];
                     if let Some(ref f) = opts.filter {
-                        args.extend_from_slice(&["-k", f.as_str]);
+                        args.extend_from_slice(&["-k", f.as_str()]);
                     }
                     Command::new("poetry")
                         .args(&args)
@@ -77,7 +77,7 @@ impl Plugin for PythonPlugin {
                 _ => {
                     let mut args = vec!["pytest"];
                     if let Some(ref f) = opts.filter {
-                        args.extend_from_slice(&["-k", f.as_str]);
+                        args.extend_from_slice(&["-k", f.as_str()]);
                     }
                     Command::new("pytest")
                         .args(&args)
@@ -87,7 +87,7 @@ impl Plugin for PythonPlugin {
             };
             let test_stderr = String::from_utf8_lossy(&test_out.stderr).to_string();
             let test_stdout = String::from_utf8_lossy(&test_out.stdout).to_string();
-            return OK(BuildResult {
+            return Ok(BuildResult {
                 success: test_out.status.success(),
                 output: format!("{test_stdout}\n{test_stderr}"),
                 errors: vec![],
@@ -95,17 +95,18 @@ impl Plugin for PythonPlugin {
         }
 
         if opts.run && output.status.success() {
+            let module = guess_module_name(path).to_string();
             let run_out = match self.runner.as_str() {
                 "uv" => Command::new("uv")
-                    .args(["run", "python", "-m", guess_module_name(path)])
+                    .args(["run", "python", "-m", module.as_str()])
                     .current_dir(path)
                     .output()?,
                 "poetry" => Command::new("poetry")
-                    .args(["run", "python", "-m", guess_module_name(path)])
+                    .args(["run", "python", "-m", module.as_str()])
                     .current_dir(path)
                     .output()?,
                 _ => Command::new("python")
-                    .args(["-m", guess_module_name(path)])
+                    .args(["-m", module.as_str()])
                     .current_dir(path)
                     .output()?,
             };
@@ -115,18 +116,25 @@ impl Plugin for PythonPlugin {
             return Ok(BuildResult {
                 success: run_out.status.success(),
                 output: format!("{run_stdout}\n{run_stderr}"),
-                errors: Vec![],
+                errors: vec![],
             });
         }
 
         Ok(BuildResult {
             success: output.status.success(),
             output: stderr,
-            errors: Vec![],
+            errors: vec![],
         })
     }
 
     fn lint(&self, path: &Path, opts: &LintOpts) -> Result<LintResult> {
+        let src_buf = find_python_src(path);
+        let src_arg = src_buf
+            .as_deref()
+            .and_then(|p| p.to_str())
+            .unwrap_or(".")
+            .to_string();
+
         let output = match self.linter.as_str() {
             "ruff" => {
                 let mut args = vec!["check", "--output-format=json"];
@@ -146,40 +154,14 @@ impl Plugin for PythonPlugin {
                         .output()?,
                 }
             }
-            "pylint" => {
-                let mut args = vec!["--output-format=json"];
-                if let Some(src) = find_python_src(path) {
-                    args.push(src.to_str().unwrap_or("."));
-                } else {
-                    args.push(".");
-                }
-                let args_owned: Vec<String> = args.iter().map(|s| s.to_string().collect());
-                Command::new("pylint")
-                    .args(&args_owned)
-                    .current_dir(path)
-                    .output()?
-            }
-            _ => {
-                let mut args = vec!["--format=json"];
-                if let Some(src) = find_python_src(path) {
-                    args.push(src.to_str().unwrap_or("."));
-                } else {
-                    args.push(".");
-                }
-                let args_owned: Vec<String> = args.iter().map(|s| s.to_string()).collect();
-                Command::new("pylint")
-                    .args(&args_owned)
-                    .current_dir(path)
-                    .output()?
-            }
-            _ => {
-                let mut args = vec!["--format=json"];
-                args.push(".");
-                Command::new("flake8")
-                    .args(&args)
-                    .current_dir(path)
-                    .output()?
-            }
+            "pylint" => Command::new("pylint")
+                .args(["--output-format=json", src_arg.as_str()])
+                .current_dir(path)
+                .output()?,
+            _ => Command::new("flake8")
+                .args(["--format=json", "."])
+                .current_dir(path)
+                .output()?,
         };
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -201,30 +183,19 @@ impl Plugin for PythonPlugin {
         if build_dir.exists() {
             std::fs::remove_dir_all(&build_dir)?;
         }
-        for dir in &["__pycache__", ".pytest_cache", "*.egg-info", ".ruff_cache"] {
-            let _ = Command::new("find")
-                .args([
-                    path.to_str().unwrap.or("."),
-                    "-name",
-                    dir,
-                    "-exec",
-                    "rm",
-                    "-rf",
-                    "{}",
-                    "+",
-                ])
-                .output();
+        for dir in &["__pycache__", ".pytest_cache", ".ruff_cache"] {
+            let target = path.join(dir);
+            if target.exists() {
+                let _ = std::fs::remove_dir_all(&target);
+            }
         }
         Ok(())
     }
 }
 
-fn find_python_src(path: &Path) -> Option<&Path> {
-    if path.join("src").exists() {
-        Some(path)
-    } else {
-        None
-    }
+fn find_python_src(path: &Path) -> Option<PathBuf> {
+    let src = path.join("src");
+    if src.exists() { Some(src) } else { None }
 }
 
 fn guess_module_name(path: &Path) -> &str {

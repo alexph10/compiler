@@ -25,13 +25,13 @@ pub enum Severity {
 pub struct BuildResult {
     pub success: bool,
     pub output: String,
-    pub errors: Vec<LintDiagnostics>,
+    pub errors: Vec<LintDiagnostic>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LintResult {
     pub success: bool,
-    pub diagnostics: Vec<LintDiagnostics>,
+    pub diagnostics: Vec<LintDiagnostic>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,6 +74,12 @@ pub struct BuildOpts {
 pub struct LintOpts {
     pub fix: bool,
     pub verbose: bool,
+}
+
+pub struct FixReport {
+    pub fixed: usize,
+    pub failed: usize,
+    pub rolled_back: usize,
 }
 
 pub trait Plugin: Send + Sync {

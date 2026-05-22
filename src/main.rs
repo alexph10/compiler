@@ -59,8 +59,8 @@ fn main() {
         }
     }
 
-    if let Command::Completions { shell } = cli.command {
-        Cli::generate_completions(shell);
+    if let Command::Completions { shell } = &cli.command {
+        Cli::generate_completions(*shell);
         return;
     }
 
@@ -73,7 +73,7 @@ fn main() {
             "error: ".red().bold(),
             cwd.display()
         );
-        std::process::exit(EXIT_NO_PROJECTS);
+        std::process::exit(EXIT_NO_PROJECT);
     }
 
     if !cli.quiet {
@@ -135,7 +135,7 @@ fn main() {
             }
 
             if lint || fix {
-                let lint_opts = LintsOpts {
+                let lint_opts = LintOpts {
                     fix: false,
                     verbose: cli.verbose,
                 };
@@ -184,25 +184,6 @@ fn main() {
                 std::process::exit(EXIT_LINT_FAIL);
             }
         }
-        Command::Lint { fix } => {
-            let opts = LintOpts {
-                fix,
-                verbose: cli.verbose,
-            };
-            let lint_start = std::time::Instant::now();
-            let results = orchestrator::run_lint(&ordered, &plugins, &opts);
-            let lint_elapsed = lint_start.elapsed();
-
-            if cli.json {
-                orchestrator::print_json_lint_results(&results);
-            } else {
-                orchestrator::print_lint_results(&results, lint_elapsed, cli.verbose)
-            }
-
-            if orchestrator::has_lint_failures(&results) {
-                std::process::exit(EXIT_LINT_FAIL);
-            }
-        }
         Command::Clean => {
             orchestrator::run_clean(&ordered, &plugins);
             println!("{}", "done".green());
@@ -236,7 +217,7 @@ fn main() {
 
             let all_diags = orchestrator::collect_all_diagnostics(&build_results, &lint_results);
 
-            let fixer = ai::AiFixer::new(confog.ai.clone())
+            let fixer = ai::AiFixer::new(config.ai.clone())
                 .with_overrides(provider.as_deref(), model.as_deref())
                 .with_max_fixes(max_fixes);
 

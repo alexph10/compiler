@@ -24,12 +24,12 @@ impl Plugin for GoPlugin {
         let ldflags;
         if opts.release {
             ldflags = "-s -w".to_string();
-            args.extend_from_slice(&["ldflags", &ldflags]);
+            args.extend_from_slice(&["-ldflags", &ldflags]);
         }
 
         args.push("./...");
 
-        let output = Command::new("go").args(&args).current_dir(path).output();
+        let output = Command::new("go").args(&args).current_dir(path).output()?;
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         let errors = parse_go_errors(&stderr);
 
@@ -108,7 +108,7 @@ impl Plugin for GoPlugin {
     }
 }
 
-fn parse_go_errors(output: &str) -> Vec<LintDiagnostics> {
+fn parse_go_errors(output: &str) -> Vec<LintDiagnostic> {
     let mut diags = Vec::new();
     let re = regex::Regex::new(r"(.+\.go):(\d+):(\d+):\s*(.+)").unwrap();
     for cap in re.captures_iter(output) {

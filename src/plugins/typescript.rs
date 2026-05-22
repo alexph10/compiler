@@ -13,7 +13,7 @@ pub struct TypeScriptPlugin {
 impl TypeScriptPlugin {
     pub fn new(config: &Config) -> Self {
         Self {
-            runtime: config.ts.config.clone(),
+            runtime: config.ts.runtime.clone(),
             package_manager: config.ts.package_manager.clone(),
             linter: config.lint.ts.clone(),
         }
@@ -50,7 +50,7 @@ impl Plugin for TypeScriptPlugin {
                     });
                 }
             }
-            "deno" => Command::new("demo")
+            "deno" => Command::new("deno")
                 .args(["compile", "--output", "build/main", "src/index.ts"])
                 .current_dir(path)
                 .output()?,
@@ -60,12 +60,12 @@ impl Plugin for TypeScriptPlugin {
                 .output()?,
         };
 
-        let stderr = String::from_utf8_lossy(&outout.stderr).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let combined = format!("{stderr}\n{stdout}");
         let errors = parse_ts_errors(&combined);
 
-        if opts.test && output.success() {
+        if opts.test && output.status.success() {
             let test_out = self.run_test(path, opts.filter.as_deref())?;
             let test_combined = String::from_utf8_lossy(&test_out.stderr).to_string();
             return Ok(BuildResult {
@@ -97,14 +97,14 @@ impl Plugin for TypeScriptPlugin {
                 if opts.fix {
                     args.extend_from_slice(&["check", "--fix", "."]);
                 } else {
-                    args.extend_from_slice(&["check", "."])
+                    args.extend_from_slice(&["check", "."]);
                 }
                 Command::new("npx").args(&args).current_dir(path).output()?
             }
             "oxlint" => {
                 let mut args = vec!["oxlint"];
                 if opts.fix {
-                    args.push("--fix")
+                    args.push("--fix");
                 }
                 args.push(".");
                 Command::new("npx").args(&args).current_dir(path).output()?
@@ -190,34 +190,7 @@ impl TypeScriptPlugin {
             }
         })
     }
-    fn run_script(&self, path: &Path) -> Result<std::process::Output> {
-        Ok(match self.runtime.as_str() {
-            "bun" => {
-                let mut args = vec!["test"];
-                if let Some(f) = filter {
-                    args.push(f);
-                }
-                Command::new("bun").args(&args).current_dir(path).output()?
-            }
-            "deno" => {
-                let mut args = vec!["test"];
-                if let Some(f) = filter {
-                    args.extend_from_slice(&["--filter", f]);
-                }
-                Command::new("deno")
-                    .args(&args)
-                    .current_dir(path)
-                    .output()?
-            }
-            _ => {
-                let mut args = vec!["jest"];
-                if let Some(f) = filter {
-                    args.extend_from_slice(&["-t", f])
-                }
-                Command::new("npx").args(&args).current_dir(path).output()?
-            }
-        })
-    }
+
     fn run_script(&self, path: &Path) -> Result<std::process::Output> {
         Ok(match self.runtime.as_str() {
             "bun" => Command::new("bun")
@@ -236,11 +209,11 @@ impl TypeScriptPlugin {
     }
 }
 
-fn parse_ts_errors(output: &str) -> Vec<LintDiagnostics> {
+fn parse_ts_errors(output: &str) -> Vec<LintDiagnostic> {
     let mut diags = Vec::new();
     let re = regex::Regex::new(r"(.+\.(?:ts|tsx|js|jsx))\((\d+),(\d+)\):\s*(\w+)\s+(\w+):\s*(.+)")
         .unwrap();
-    for cap in re.capture_iter(output) {
+    for cap in re.captures_iter(output) {
         diags.push(LintDiagnostic {
             file: cap[1].to_string(),
             line: cap[2].parse().unwrap_or(0),
