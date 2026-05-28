@@ -1,11 +1,5 @@
-<div align='center'>
-    <h3>compiler</h3>
-    <p>Polyglot build tool for Windows that detects, orchestrates, and AI-fixes projects across six languages</p>
-    <br/>
-    <br/>
-</div>
-
-A Windows-compatible reimplementation of [plyght/poc](https://github.com/plyght/poc). Drop into any directory containing Rust, Go, TypeScript, C/C++, Python, or Zig projects and `compiler` will discover them, resolve inter-project dependencies via topological sort, build independent projects in parallel, lint with your preferred toolchain, and optionally feed errors to an LLM for automated fixes with rollback safety.
+#### compiler *win compatible
+Drop into any directory containing Rust, Go, TypeScript, C/C++, Python, or Zig projects and `compiler` will discover them, resolve inter-project dependencies via topological sort, build independent projects in parallel, lint with your preferred toolchain, and optionally feed errors to an LLM for automated fixes with rollback safety.
 
 ## Features
 
