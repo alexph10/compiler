@@ -8,7 +8,6 @@ Drop into any directory containing Rust, Go, TypeScript, C/C++, Python, or Zig p
 - **Parallel Builds**: Independent projects within the dependency graph are built concurrently via Rayon using proper topological-level grouping
 - **Build Caching**: Hashes source files with SHA-256 and skips rebuilds when nothing has changed
 - **Unified Linting**: Delegates to per-language linters (Clippy, golangci-lint, Biome, clang-tidy, Ruff, zig build) through a common plugin interface
-- **AI-Powered Fixes**: Sends build/lint diagnostics to Ollama, Anthropic, or any OpenAI-compatible endpoint; batches errors per-file for efficient LLM usage; rolls back garbage responses
 - **Watch Mode**: Uses `ReadDirectoryChangesW` via the `notify` crate with a polling fallback for automatic rebuild/lint on save
 - **Plugin Architecture**: Each language is a `Plugin` trait implementation, making new languages a single-file addition
 - **Configurable Toolchains**: Override runtimes, compilers, linkers, package managers, and linters via TOML config or CLI flags
@@ -39,61 +38,6 @@ Copy-Item .\target\release\compiler.exe "$env:USERPROFILE\.cargo\bin\"
 ```
 
 Make sure `%USERPROFILE%\.cargo\bin` is on your `PATH`.
-
-#### Usage
-
-```powershell
-compiler build              # detect and build all projects
-compiler build --test       # build then run tests
-compiler build --run        # build then run the artifact
-compiler build --lint       # build then lint
-compiler build --clean      # clean before building
-compiler build --fix        # build, lint, then AI-fix errors
-compiler build --release    # optimized build
-
-compiler test               # run tests across all projects
-compiler test --filter foo  # filter tests by name pattern
-
-compiler lint               # lint all detected projects
-compiler lint --fix         # auto-fix lint issues
-
-compiler clean              # remove build artifacts
-
-compiler fix                # build + lint + AI-fix in one pass
-compiler fix --provider anthropic --model claude-sonnet-4-20250514
-compiler fix --max-fixes 5  # limit to fixing 5 files
-
-compiler init               # generate .compiler/config.toml from detected projects
-compiler status             # show project status, toolchains, and config
-compiler graph              # print dependency graph (ASCII)
-compiler graph --dot        # print dependency graph (Graphviz DOT)
-
-compiler watch              # rebuild on file changes
-compiler watch --test       # rebuild and test on changes
-compiler watch --lint       # rebuild and lint on changes
-
-compiler completions powershell  # generate shell completions
-compiler completions bash
-compiler completions zsh
-compiler completions fish
-```
-
-Global flags apply to all subcommands:
-
-```powershell
-compiler --runtime deno build          # override TS runtime
-compiler --package-manager pnpm build  # override TS package manager
-compiler --compiler gcc build          # override C/C++ compiler
-compiler --linker mold build           # override Rust linker
-compiler --runner poetry build         # override Python runner
-compiler --linter eslint lint          # override linter
-compiler --json build                  # output results as JSON
-compiler --filter rust build           # only build Rust projects
-compiler --only .\my-app build         # only build specific project
-compiler --quiet build                 # suppress non-error output
-compiler --verbose build               # verbose output
-compiler --no-color build              # disable ANSI colors
-```
 
 #### Exit Codes
 
