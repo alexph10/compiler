@@ -1,7 +1,7 @@
 #### compiler *win compatible
 Drop into any directory containing Rust, Go, TypeScript, C/C++, Python, or Zig projects and `compiler` will discover them, resolve inter-project dependencies via topological sort, build independent projects in parallel, lint with your preferred toolchain, and optionally feed errors to an LLM for automated fixes with rollback safety.
 
-## Features
+#### Features
 
 - **Polyglot Detection**: Walks the directory tree and identifies projects by manifest files (Cargo.toml, go.mod, package.json, CMakeLists.txt, Makefile)
 - **Dependency-Aware Ordering**: Parses manifests for path/local dependencies and topologically sorts the build graph, with cycle detection fallback
@@ -18,7 +18,7 @@ Drop into any directory containing Rust, Go, TypeScript, C/C++, Python, or Zig p
 - **Dependency Graph Visualization**: ASCII or Graphviz DOT output of the project dependency graph
 - **No System OpenSSL**: Ships with `rustls` so it runs as a standalone `compiler.exe` with no native crypto dependencies
 
-## Supported Languages
+#### Supported Languages
 
 | Language | Manifest | Compiler/Runtime | Linter | Build System |
 |---|---|---|---|---|
@@ -29,7 +29,7 @@ Drop into any directory containing Rust, Go, TypeScript, C/C++, Python, or Zig p
 | Python | `pyproject.toml` | uv/pip/poetry/pdm | ruff | uv/pip/poetry/pdm |
 | Zig | `build.zig` | zig | zig build | zig build |
 
-## Install
+#### Install
 
 ```powershell
 git clone https://github.com/alexph10/compiler.git
@@ -40,7 +40,7 @@ Copy-Item .\target\release\compiler.exe "$env:USERPROFILE\.cargo\bin\"
 
 Make sure `%USERPROFILE%\.cargo\bin` is on your `PATH`.
 
-## Usage
+#### Usage
 
 ```powershell
 compiler build              # detect and build all projects
@@ -95,7 +95,7 @@ compiler --verbose build               # verbose output
 compiler --no-color build              # disable ANSI colors
 ```
 
-## Exit Codes
+#### Exit Codes
 
 | Code | Meaning |
 |---|---|
@@ -105,7 +105,7 @@ compiler --no-color build              # disable ANSI colors
 | 3 | AI fix failure |
 | 4 | No projects detected |
 
-## Configuration
+#### Configuration
 
 `compiler` loads configuration from `.compiler\config.toml` in the project root, falling back to `%APPDATA%\compiler\config.toml`:
 
@@ -139,7 +139,7 @@ The AI provider can be `ollama` (default, local), `anthropic` (requires `ANTHROP
 
 Run `compiler init` to auto-generate `.compiler\config.toml` based on detected projects. Unknown config sections and invalid provider names will produce warnings. Build caches are stored in `.compiler\cache\`. Add `.compiler/` to your `.gitignore`.
 
-## Architecture
+#### Architecture
 
 ```
 src/
@@ -162,7 +162,7 @@ src/
 
 The orchestrator builds a dependency graph from manifest analysis, groups projects by topological level for maximum parallelism, and dispatches each level to Rayon's thread pool. Successful builds are cached by content hash; unchanged projects are skipped on subsequent runs. Each plugin encapsulates detection, build, lint, and clean operations for its language. The AI fixer batches all errors per-file into a single LLM prompt, validates response quality, and rolls back suspicious fixes.
 
-## Development
+#### Development
 
 ```powershell
 cargo build
