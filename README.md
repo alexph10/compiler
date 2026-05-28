@@ -1,5 +1,5 @@
 #### compiler *win compatible
-Drop into any directory containing Rust, Go, TypeScript, C/C++, Python, or Zig projects and `compiler` will discover them, resolve inter-project dependencies via topological sort, build independent projects in parallel, lint with your preferred toolchain, and optionally feed errors to an LLM for automated fixes with rollback safety.
+Drop into a directory containing Rust, Go, TypeScript, C/C++, Python, or Zig projects and `compiler` will discover them, resolve inter-project dependencies via topological sort, build independent projects in parallel, lint with your preferred toolchain, and optionally feed errors to an LLM for automated fixes with rollback safety.
 
 #### Features
 
