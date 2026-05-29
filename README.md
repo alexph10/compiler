@@ -79,42 +79,6 @@ model = "llama3"
 endpoint = "http://127.0.0.1:11434"
 ```
 
-The AI provider can be `ollama` (default, local), `anthropic` (requires `ANTHROPIC_API_KEY`), or any OpenAI-compatible endpoint (requires `OPENAI_API_KEY`).
-
-Run `compiler init` to auto-generate `.compiler\config.toml` based on detected projects. Unknown config sections and invalid provider names will produce warnings. Build caches are stored in `.compiler\cache\`. Add `.compiler/` to your `.gitignore`.
-
-#### Architecture
-
-```
-src/
-  main.rs           CLI entry point and command dispatch
-  cli.rs            Argument parsing via clap derive
-  config.rs         TOML config loading, generation, and validation
-  types.rs          Core traits (Plugin) and shared types
-  walker.rs         Recursive project discovery and watch mode (notify + polling fallback)
-  orchestrator.rs   Dependency resolution, parallel execution, caching, result reporting
-  ai.rs             LLM integration with batched-by-file fixing and rollback logic
-  plugins/
-    mod.rs          Plugin registry
-    rust.rs         Rust plugin (cargo)
-    go.rs           Go plugin (go build)
-    typescript.rs   TypeScript plugin (bun/node/deno)
-    c.rs            C/C++ plugin (cmake/make + clang/gcc)
-    python.rs       Python plugin (uv/pip/poetry/pdm)
-    zig.rs          Zig plugin (zig build)
-```
-
-The orchestrator builds a dependency graph from manifest analysis, groups projects by topological level for maximum parallelism, and dispatches each level to Rayon's thread pool. Successful builds are cached by content hash; unchanged projects are skipped on subsequent runs. Each plugin encapsulates detection, build, lint, and clean operations for its language. The AI fixer batches all errors per-file into a single LLM prompt, validates response quality, and rolls back suspicious fixes.
-
-#### Development
-
-```powershell
-cargo build
-cargo test
-cargo clippy
-```
-
-Requires Rust 1.85+ (edition 2024). Key dependencies: clap, clap_complete, rayon, reqwest (blocking, rustls-tls), serde, toml, walkdir, notify, regex, colored, dirs, sha2.
 
 ## License
 
